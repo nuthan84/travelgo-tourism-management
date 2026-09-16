@@ -33,10 +33,21 @@ dist-ssr/
 
 # Environment variables
 .env
+*.env
+.env.*
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Secrets & Credential files
+application-local.properties
+application-prod.properties
+credentials.json
+service-account.json
+*.pem
+*.key
+*.crt
 
 # IDE
 .idea/

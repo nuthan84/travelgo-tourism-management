@@ -12,13 +12,16 @@ import java.util.Date;
 @Component
 public class JwtUtils {
 
-    @Value("${travelgo.jwt.secret:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}")
+    @Value("${travelgo.jwt.secret:}")
     private String jwtSecret;
 
     @Value("${travelgo.jwt.expiration-ms:86400000}")
     private int jwtExpirationMs;
 
     private Key getSigningKey() {
+        if (jwtSecret == null || jwtSecret.trim().length() < 32) {
+            return Keys.hmacShaKeyFor("TravelGoDevJwtSecretKeyForLocalTestingOnlyDoNotUseInProduction2025!".getBytes(StandardCharsets.UTF_8));
+        }
         return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
