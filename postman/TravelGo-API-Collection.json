@@ -1,0 +1,314 @@
+{
+  "info": {
+    "name": "TravelGo Tourism Management System API",
+    "description": "Complete REST API collection for TravelGo Tourism Management System, covering Authentication, Destinations, Packages, Bookings, Razorpay Payments, Wishlist, Reviews, and Admin operations.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080/api",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Test Traveller\",\n  \"email\": \"traveller@example.com\",\n  \"password\": \"Traveler@123\",\n  \"phone\": \"+91 9876543210\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login User / Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData.token) {",
+                  "    pm.collectionVariables.set('authToken', jsonData.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@travelgo.com\",\n  \"password\": \"Admin@123\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Get Current User Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/auth/me"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Destinations",
+      "item": [
+        {
+          "name": "Get All Destinations",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/destinations?activeOnly=true"
+          }
+        },
+        {
+          "name": "Get Destination By ID",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/destinations/1"
+          }
+        },
+        {
+          "name": "Create Destination (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Varanasi\",\n  \"state\": \"Uttar Pradesh\",\n  \"country\": \"India\",\n  \"description\": \"One of the world's oldest continuously inhabited cities on the banks of holy river Ganga.\",\n  \"imageUrl\": \"https://images.unsplash.com/photo-1561361513-2d000a50f0dc?auto=format&fit=crop&w=1200&q=80\",\n  \"category\": \"Spiritual & Heritage\",\n  \"latitude\": 25.3176,\n  \"longitude\": 82.9739,\n  \"status\": \"ACTIVE\"\n}"
+            },
+            "url": "{{baseUrl}}/destinations"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Tour Packages",
+      "item": [
+        {
+          "name": "Get Packages (With Filters)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/packages?category=Adventure&minPrice=10000&maxPrice=50000&search=kashmir",
+              "host": ["{{baseUrl}}"],
+              "path": ["packages"],
+              "query": [
+                { "key": "category", "value": "Adventure" },
+                { "key": "minPrice", "value": "10000" },
+                { "key": "maxPrice", "value": "50000" },
+                { "key": "search", "value": "kashmir" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Package Details",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/packages/3"
+          }
+        },
+        {
+          "name": "Create Tour Package (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destinationId\": 1,\n  \"name\": \"Munnar Tea Hills Explorer\",\n  \"description\": \"Immerse yourself in verdant rolling tea gardens.\",\n  \"durationDays\": 3,\n  \"durationNights\": 2,\n  \"pricePerPerson\": 16999,\n  \"maxTravellers\": 8,\n  \"category\": \"Family\",\n  \"mainImageUrl\": \"https://images.unsplash.com/photo-1602216056096-3b40cc0c9944?auto=format&fit=crop&w=800&q=80\",\n  \"includedServices\": \"Resort stay, Daily Breakfast, Tea factory tour\",\n  \"excludedServices\": \"Flights, Personal shopping\",\n  \"itinerary\": \"Day 1: Arrival in Munnar\\nDay 2: Tea plantation safari\\nDay 3: Departure\",\n  \"cancellationPolicy\": \"Full refund up to 7 days prior to departure.\",\n  \"status\": \"ACTIVE\",\n  \"galleryImages\": []\n}"
+            },
+            "url": "{{baseUrl}}/packages"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Create Booking",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": 3,\n  \"travelDate\": \"2025-04-15\",\n  \"travellers\": 2,\n  \"contactName\": \"John Doe\",\n  \"contactEmail\": \"john@example.com\",\n  \"contactPhone\": \"+91 9876543210\",\n  \"specialRequests\": \"Lake-view houseboat preference\"\n}"
+            },
+            "url": "{{baseUrl}}/bookings"
+          }
+        },
+        {
+          "name": "Get User Bookings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/bookings/my"
+          }
+        },
+        {
+          "name": "Cancel Booking",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/bookings/1/cancel"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "Create Razorpay Order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": 1\n}"
+            },
+            "url": "{{baseUrl}}/payments/create-order"
+          }
+        },
+        {
+          "name": "Verify Payment Signature",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bookingId\": 1,\n  \"razorpayOrderId\": \"order_P9182371k2h198\",\n  \"razorpayPaymentId\": \"pay_P9182381273912\",\n  \"razorpaySignature\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n  \"paymentMethod\": \"UPI\"\n}"
+            },
+            "url": "{{baseUrl}}/payments/verify"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Wishlist",
+      "item": [
+        {
+          "name": "Get Wishlist",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/wishlist"
+          }
+        },
+        {
+          "name": "Add To Wishlist",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/wishlist/1"
+          }
+        },
+        {
+          "name": "Remove From Wishlist",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/wishlist/1"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Get Package Reviews",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/reviews/package/3"
+          }
+        },
+        {
+          "name": "Submit Review",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{authToken}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"packageId\": 3,\n  \"rating\": 5,\n  \"comment\": \"Exceptional tour arrangement by TravelGo!\"\n}"
+            },
+            "url": "{{baseUrl}}/reviews"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Dashboard Stats",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/admin/dashboard"
+          }
+        },
+        {
+          "name": "Get All Users",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/admin/users"
+          }
+        },
+        {
+          "name": "Get All Bookings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/admin/bookings"
+          }
+        },
+        {
+          "name": "Get All Payments",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{authToken}}" }],
+            "url": "{{baseUrl}}/admin/payments"
+          }
+        }
+      ]
+    }
+  ]
+}
