@@ -9,6 +9,8 @@ param (
     [string]$Database = "tourism_db"
 )
 
+$OutputEncoding = [System.Text.Encoding]::UTF8
+
 Write-Host "==========================================================" -ForegroundColor Cyan
 Write-Host "       TravelGo - Aiven MySQL Cloud Database Migration   " -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
@@ -32,7 +34,7 @@ if (-not $HostName) {
     $HostName = Read-Host "Enter Aiven MySQL Host (e.g. mysql-xxxx-yyyy.aivencloud.com)"
 }
 if (-not $Port -or $Port -eq 3306) {
-    $portInput = Read-Host "Enter Aiven MySQL Port [Default: $Port]"
+    $portInput = Read-Host "Enter Aiven MySQL Port [Default: 3306 or 18442]"
     if ($portInput) { $Port = [int]$portInput }
 }
 if (-not $User) {
@@ -62,8 +64,8 @@ if (-not (Test-Path $schemaPath)) {
 Write-Host "`n[*] Connecting to Aiven MySQL ($HostName`:$Port) and creating database '$Database'..." -ForegroundColor Cyan
 
 # Step 1: Ensure database exists
-$createDbCmd = "CREATE DATABASE IF NOT EXISTS \`$Database\`;"
-& $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED -e $createDbCmd 2>&1
+$createDbCmd = "CREATE DATABASE IF NOT EXISTS $Database;"
+& $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED -e $createDbCmd
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[!] Could not connect or create database. Please verify host, port, credentials and SSL." -ForegroundColor Red
     $env:MYSQL_PWD = $null
@@ -73,7 +75,7 @@ Write-Host "[✓] Database '$Database' verified." -ForegroundColor Green
 
 # Step 2: Import schema.sql
 Write-Host "[*] Importing schema.sql..." -ForegroundColor Cyan
-Get-Content -Path $schemaPath -Raw | & $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED $Database 2>&1
+Get-Content -Path $schemaPath -Raw | & $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED --default-character-set=utf8mb4 $Database
 if ($LASTEXITCODE -ne 0) {
     Write-Host "[!] Failed to import schema.sql" -ForegroundColor Red
     $env:MYSQL_PWD = $null
@@ -84,7 +86,7 @@ Write-Host "[✓] Schema imported successfully." -ForegroundColor Green
 # Step 3: Import seed.sql
 if (Test-Path $seedPath) {
     Write-Host "[*] Importing seed.sql..." -ForegroundColor Cyan
-    Get-Content -Path $seedPath -Raw | & $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED $Database 2>&1
+    Get-Content -Path $seedPath -Raw | & $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED --default-character-set=utf8mb4 $Database
     if ($LASTEXITCODE -ne 0) {
         Write-Host "[!] Failed to import seed.sql" -ForegroundColor Red
         $env:MYSQL_PWD = $null
@@ -95,25 +97,9 @@ if (Test-Path $seedPath) {
 
 # Step 4: Verification Query
 Write-Host "`n[*] Verifying table row counts in '$Database'..." -ForegroundColor Cyan
-$verifySql = @"
-SELECT 'users' AS tableName, COUNT(*) AS rowCount FROM users
-UNION ALL
-SELECT 'destinations', COUNT(*) FROM destinations
-UNION ALL
-SELECT 'tour_packages', COUNT(*) FROM tour_packages
-UNION ALL
-SELECT 'package_images', COUNT(*) FROM package_images
-UNION ALL
-SELECT 'bookings', COUNT(*) FROM bookings
-UNION ALL
-SELECT 'payments', COUNT(*) FROM payments
-UNION ALL
-SELECT 'reviews', COUNT(*) FROM reviews
-UNION ALL
-SELECT 'wishlist', COUNT(*) FROM wishlist;
-"@
+$verifySql = "SELECT 'users' AS tableName, COUNT(*) AS rowCount FROM users UNION ALL SELECT 'destinations', COUNT(*) FROM destinations UNION ALL SELECT 'tour_packages', COUNT(*) FROM tour_packages UNION ALL SELECT 'package_images', COUNT(*) FROM package_images UNION ALL SELECT 'bookings', COUNT(*) FROM bookings UNION ALL SELECT 'payments', COUNT(*) FROM payments UNION ALL SELECT 'reviews', COUNT(*) FROM reviews UNION ALL SELECT 'wishlist', COUNT(*) FROM wishlist;"
 
-& $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED $Database -e $verifySql
+& $mysqlExe -h $HostName -P $Port -u $User --ssl-mode=REQUIRED --table $Database -e $verifySql
 
 # Clean up memory
 $env:MYSQL_PWD = $null
