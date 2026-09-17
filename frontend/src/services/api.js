@@ -6,8 +6,8 @@ export const request = async (endpoint, options = {}) => {
     ...options.headers
   };
 
-  // Only set Content-Type to application/json if not FormData
-  if (!(options.body instanceof FormData)) {
+  // Only set Content-Type to application/json if body exists and is not FormData
+  if (options.body && !(options.body instanceof FormData)) {
     headers['Content-Type'] = 'application/json';
   }
 

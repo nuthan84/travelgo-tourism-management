@@ -2,29 +2,52 @@ import React, { useState, useEffect } from 'react';
 import adminService from '../services/adminService';
 import Loader from '../components/Loader';
 import { formatCurrency, formatDate } from '../utils/formatCurrency';
-import { Users, Package, CalendarCheck, IndianRupee, TrendingUp, BarChart3, Clock, MapPin } from 'lucide-react';
+import { Users, Package, CalendarCheck, IndianRupee, TrendingUp, BarChart3, Clock, MapPin, AlertCircle, RefreshCw } from 'lucide-react';
 
 export const AdminDashboard = () => {
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const fetchDashboard = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await adminService.getDashboardStats();
+      setStats(data);
+    } catch (err) {
+      console.error("Failed to load admin stats:", err);
+      setError(err.message || "Failed to connect to backend server.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchDashboard = async () => {
-      try {
-        const data = await adminService.getDashboardStats();
-        setStats(data);
-      } catch (err) {
-        console.error("Failed to load admin stats:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchDashboard();
   }, []);
 
   if (loading) return <Loader message="Loading admin metrics..." />;
-  if (!stats) return <div className="p-8 text-center">Failed to load statistics.</div>;
+  if (error || !stats) {
+    return (
+      <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm text-center max-w-lg mx-auto my-12 space-y-4">
+        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
+          <AlertCircle className="w-6 h-6" />
+        </div>
+        <h3 className="text-lg font-bold text-gray-900">Admin Metrics Unavailable</h3>
+        <p className="text-xs text-gray-500 max-w-sm mx-auto">
+          {error || "Failed to load dashboard statistics from backend."}
+        </p>
+        <button
+          onClick={fetchDashboard}
+          className="inline-flex items-center px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shadow transition space-x-2"
+        >
+          <RefreshCw className="w-3.5 h-3.5" />
+          <span>Retry Connection</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

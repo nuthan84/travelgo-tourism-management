@@ -17,6 +17,11 @@ export const Confirmation = () => {
     const fetchBooking = async () => {
       try {
         const data = await bookingService.getById(bookingId);
+        if (data && data.status === 'PENDING') {
+          // Unconfirmed booking must complete payment first
+          navigate(`/payment/${bookingId}`, { replace: true });
+          return;
+        }
         setBooking(data);
       } catch (err) {
         console.error("Error fetching confirmation booking:", err);
@@ -26,7 +31,7 @@ export const Confirmation = () => {
     };
 
     fetchBooking();
-  }, [bookingId]);
+  }, [bookingId, navigate]);
 
   const handleCopyReference = () => {
     if (booking?.bookingReference) {

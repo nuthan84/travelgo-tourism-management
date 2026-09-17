@@ -61,30 +61,29 @@ public class PaymentService {
             throw new BadRequestException("Cannot make payment for a cancelled booking.");
         }
 
-        String orderId;
-        BigDecimal amount = booking.getTotalAmount();
-        long amountInPaise = amount.multiply(new BigDecimal(100)).longValue();
-
-        if (razorpayKeyId != null && !razorpayKeyId.trim().isEmpty() &&
-            razorpayKeySecret != null && !razorpayKeySecret.trim().isEmpty()) {
-            try {
-                RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
-                JSONObject orderRequest = new JSONObject();
-                orderRequest.put("amount", amountInPaise);
-                orderRequest.put("currency", "INR");
-                orderRequest.put("receipt", booking.getBookingReference());
-
-                Order order = client.orders.create(orderRequest);
-                orderId = order.get("id");
-            } catch (RazorpayException e) {
-                throw new BadRequestException("Failed to initiate Razorpay order: " + e.getMessage());
-            }
-        } else {
-            // Test simulated order ID when live keys are pending
-            orderId = "order_sim_" + UUID.randomUUID().toString().substring(0, 14);
+        if (razorpayKeyId == null || razorpayKeyId.trim().isEmpty() ||
+            razorpayKeySecret == null || razorpayKeySecret.trim().isEmpty()) {
+            throw new BadRequestException("Razorpay Test Mode credentials are not configured on the server. Please configure RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET in the backend environment.");
         }
 
-        // Create or update payment record
+        BigDecimal amount = booking.getTotalAmount();
+        long amountInPaise = amount.multiply(new BigDecimal(100)).longValue();
+        String orderId;
+
+        try {
+            RazorpayClient client = new RazorpayClient(razorpayKeyId, razorpayKeySecret);
+            JSONObject orderRequest = new JSONObject();
+            orderRequest.put("amount", amountInPaise);
+            orderRequest.put("currency", "INR");
+            orderRequest.put("receipt", booking.getBookingReference());
+
+            Order order = client.orders.create(orderRequest);
+            orderId = order.get("id");
+        } catch (RazorpayException e) {
+            throw new BadRequestException("Failed to initiate Razorpay order: " + e.getMessage());
+        }
+
+        // Create or update payment record with status CREATED
         Optional<Payment> existingPayment = paymentRepository.findByBookingId(booking.getId());
         Payment payment = existingPayment.orElseGet(Payment::new);
         payment.setBooking(booking);
@@ -99,13 +98,13 @@ public class PaymentService {
                 orderId,
                 amount,
                 "INR",
-                razorpayKeyId != null && !razorpayKeyId.isEmpty() ? razorpayKeyId : "rzp_test_demo",
+                razorpayKeyId,
                 booking.getId(),
                 booking.getBookingReference()
         );
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public PaymentDTO verifyPayment(PaymentVerifyRequest request, String userEmail, boolean isAdmin) {
         Booking booking = bookingRepository.findById(request.getBookingId())
                 .orElseThrow(() -> new ResourceNotFoundException("Booking not found with id: " + request.getBookingId()));
@@ -117,19 +116,24 @@ public class PaymentService {
         Payment payment = paymentRepository.findByBookingId(booking.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Payment record not found for booking id: " + request.getBookingId()));
 
-        boolean isSignatureValid = false;
+        if (razorpayKeySecret == null || razorpayKeySecret.trim().isEmpty()) {
+            throw new BadRequestException("Razorpay Key Secret is not configured on the server.");
+        }
 
-        if (razorpayKeySecret != null && !razorpayKeySecret.trim().isEmpty() && !request.getRazorpayOrderId().startsWith("order_sim_")) {
-            try {
-                String payload = request.getRazorpayOrderId() + "|" + request.getRazorpayPaymentId();
-                String expectedSignature = calculateHmacSha256(payload, razorpayKeySecret);
-                isSignatureValid = expectedSignature.equals(request.getRazorpaySignature());
-            } catch (Exception e) {
-                isSignatureValid = false;
-            }
-        } else {
-            // In demo/test simulated mode, approve if signature is present
-            isSignatureValid = request.getRazorpaySignature() != null && !request.getRazorpaySignature().trim().isEmpty();
+        if (request.getRazorpayOrderId() == null || request.getRazorpayOrderId().trim().isEmpty() ||
+            request.getRazorpayPaymentId() == null || request.getRazorpayPaymentId().trim().isEmpty() ||
+            request.getRazorpaySignature() == null || request.getRazorpaySignature().trim().isEmpty()) {
+            throw new BadRequestException("Missing required Razorpay payment verification parameters.");
+        }
+
+        // Verify Razorpay HMAC-SHA256 signature: payload = order_id + "|" + payment_id
+        boolean isSignatureValid = false;
+        try {
+            String payload = request.getRazorpayOrderId() + "|" + request.getRazorpayPaymentId();
+            String expectedSignature = calculateHmacSha256(payload, razorpayKeySecret);
+            isSignatureValid = expectedSignature.equals(request.getRazorpaySignature());
+        } catch (Exception e) {
+            isSignatureValid = false;
         }
 
         if (!isSignatureValid) {
@@ -138,7 +142,7 @@ public class PaymentService {
             throw new BadRequestException("Payment verification failed! Invalid Razorpay signature.");
         }
 
-        // Update Payment status
+        // Update Payment status to SUCCESS only after successful verification
         payment.setRazorpayPaymentId(request.getRazorpayPaymentId());
         payment.setRazorpaySignature(request.getRazorpaySignature());
         payment.setStatus(PaymentStatus.SUCCESS);

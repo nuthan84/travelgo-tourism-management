@@ -61,6 +61,9 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                // Allow all OPTIONS requests (CORS preflight)
+                .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
                 // Public endpoints
                 .requestMatchers("/api/auth/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/destinations/**").permitAll()
@@ -69,6 +72,7 @@ public class SecurityConfig {
                 
                 // Admin endpoints
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/reviews/admin/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.POST, "/api/destinations/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.PUT, "/api/destinations/**").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.DELETE, "/api/destinations/**").hasRole("ADMIN")

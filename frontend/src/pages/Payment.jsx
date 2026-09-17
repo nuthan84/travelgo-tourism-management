@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import bookingService from '../services/bookingService';
 import paymentService from '../services/paymentService';
 import Loader from '../components/Loader';
 import { formatCurrency } from '../utils/formatCurrency';
-import { ShieldCheck, Lock, CreditCard, CheckCircle2, AlertCircle } from 'lucide-react';
+import { ShieldCheck, Lock, CreditCard, CheckCircle2, AlertCircle, ArrowLeft } from 'lucide-react';
 
 export const Payment = () => {
   const { bookingId } = useParams();
@@ -38,66 +38,69 @@ export const Payment = () => {
       setProcessing(true);
       setError('');
 
+      if (!window.Razorpay) {
+        setError("Razorpay Checkout SDK is not available. Please verify your internet connection.");
+        setProcessing(false);
+        return;
+      }
+
       // Step 1: Create Order on backend
       const orderData = await paymentService.createOrder(bookingId);
 
-      // Step 2: Launch Razorpay Checkout if window.Razorpay exists
-      if (window.Razorpay && !orderData.orderId.startsWith('order_sim_')) {
-        const options = {
-          key: orderData.keyId,
-          amount: Math.round(Number(orderData.amount) * 100),
-          currency: orderData.currency || 'INR',
-          name: 'TravelGo',
-          description: `Booking #${orderData.bookingReference}`,
-          image: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?auto=format&fit=crop&w=120&q=80',
-          order_id: orderData.orderId,
-          handler: async (response) => {
-            try {
-              await paymentService.verifyPayment({
-                bookingId: Number(bookingId),
-                razorpayOrderId: response.razorpay_order_id,
-                razorpayPaymentId: response.razorpay_payment_id,
-                razorpaySignature: response.razorpay_signature,
-                paymentMethod: 'Razorpay'
-              });
-              navigate(`/confirmation/${bookingId}`);
-            } catch (vErr) {
-              setError("Payment verification failed: " + vErr.message);
-              setProcessing(false);
-            }
-          },
-          prefill: {
-            name: booking.contactName,
-            email: booking.contactEmail,
-            contact: booking.contactPhone
-          },
-          theme: {
-            color: '#2563eb'
-          }
-        };
-
-        const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', function (failRes) {
-          setError(`Payment Failed: ${failRes.error?.description || 'Transaction declined'}`);
-          setProcessing(false);
-        });
-        rzp.open();
-      } else {
-        // Test mode / simulated transaction fallback
-        const simulatedPaymentId = 'pay_sim_' + Math.random().toString(36).substring(2, 12);
-        const simulatedSig = 'sim_signature_' + Math.random().toString(36).substring(2, 12);
-
-        await paymentService.verifyPayment({
-          bookingId: Number(bookingId),
-          razorpayOrderId: orderData.orderId,
-          razorpayPaymentId: simulatedPaymentId,
-          razorpaySignature: simulatedSig,
-          paymentMethod: 'Razorpay UPI (Test Mode)'
-        });
-
-        navigate(`/confirmation/${bookingId}`);
+      if (!orderData || !orderData.orderId) {
+        throw new Error("Unable to obtain Razorpay order from backend.");
       }
+
+      const razorpayKey = orderData.keyId || import.meta.env.VITE_RAZORPAY_KEY_ID;
+
+      // Step 2: Launch real Razorpay Checkout
+      const options = {
+        key: razorpayKey,
+        amount: Math.round(Number(orderData.amount) * 100),
+        currency: orderData.currency || 'INR',
+        name: 'TravelGo',
+        description: `Booking #${orderData.bookingReference}`,
+        image: 'https://images.unsplash.com/photo-1566837945700-30057527ade0?auto=format&fit=crop&w=120&q=80',
+        order_id: orderData.orderId,
+        handler: async (response) => {
+          try {
+            await paymentService.verifyPayment({
+              bookingId: Number(bookingId),
+              razorpayOrderId: response.razorpay_order_id,
+              razorpayPaymentId: response.razorpay_payment_id,
+              razorpaySignature: response.razorpay_signature,
+              paymentMethod: 'Razorpay'
+            });
+            navigate(`/confirmation/${bookingId}`);
+          } catch (vErr) {
+            setError("Payment verification failed: " + (vErr.message || 'Invalid signature.'));
+            setProcessing(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setProcessing(false);
+            setError("Payment window closed. Your booking remains in PENDING status.");
+          }
+        },
+        prefill: {
+          name: booking.contactName,
+          email: booking.contactEmail,
+          contact: booking.contactPhone
+        },
+        theme: {
+          color: '#2563eb'
+        }
+      };
+
+      const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', function (failRes) {
+        setError(`Payment Failed: ${failRes.error?.description || 'Transaction declined'}. Booking remains PENDING.`);
+        setProcessing(false);
+      });
+      rzp.open();
     } catch (err) {
+      console.error("Payment error:", err);
       setError(err.message || 'Payment initiation failed.');
       setProcessing(false);
     }
@@ -139,9 +142,15 @@ export const Payment = () => {
         {/* Payment Summary */}
         <div className="p-6 sm:p-8 space-y-6">
           {error && (
-            <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-red-700 text-xs font-semibold flex items-center">
-              <AlertCircle className="w-4 h-4 mr-2 shrink-0" />
-              <span>{error}</span>
+            <div className="p-4 bg-amber-50/90 border border-amber-200 rounded-2xl text-amber-900 text-xs space-y-1">
+              <div className="flex items-center font-bold text-amber-900">
+                <AlertCircle className="w-4 h-4 mr-2 shrink-0 text-amber-600" />
+                <span>Payment Notice (Booking remains PENDING)</span>
+              </div>
+              <p className="pl-6 text-amber-800 leading-relaxed">{error}</p>
+              <p className="pl-6 text-[11px] text-amber-700">
+                Your reservation is safely saved. You can retry payment anytime from your account.
+              </p>
             </div>
           )}
 
@@ -207,6 +216,23 @@ export const Payment = () => {
               </>
             )}
           </button>
+
+          {/* Secondary Action Links */}
+          <div className="pt-2 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-gray-500">
+            <Link
+              to="/my-bookings"
+              className="hover:text-blue-600 font-semibold transition flex items-center"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1" />
+              Return to My Bookings (Booking stays PENDING)
+            </Link>
+            <Link
+              to="/packages"
+              className="hover:text-blue-600 font-semibold transition"
+            >
+              Explore Other Packages
+            </Link>
+          </div>
         </div>
 
       </div>

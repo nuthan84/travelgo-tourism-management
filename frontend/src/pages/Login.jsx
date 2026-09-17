@@ -124,7 +124,7 @@ export const Login = () => {
           <div className="grid grid-cols-2 gap-2 text-xs">
             <button
               type="button"
-              onClick={() => handleQuickLogin('admin@travelgo.com', 'Admin@123')}
+              onClick={() => handleQuickLogin('admin@travelgo.com', '123456')}
               className="py-2 px-3 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 rounded-xl border border-gray-200 font-semibold transition text-left"
             >
               <span className="block font-bold">Admin Demo</span>
@@ -132,7 +132,7 @@ export const Login = () => {
             </button>
             <button
               type="button"
-              onClick={() => handleQuickLogin('john@example.com', 'User@123')}
+              onClick={() => handleQuickLogin('john@example.com', '123456')}
               className="py-2 px-3 bg-gray-50 hover:bg-blue-50 hover:text-blue-700 rounded-xl border border-gray-200 font-semibold transition text-left"
             >
               <span className="block font-bold">User Demo</span>
